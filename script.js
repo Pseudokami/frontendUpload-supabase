@@ -1,21 +1,18 @@
+// script.js
 // --- CONFIGURATION ---
-const SUPABASE_URL = 'https://egnrgisgkgekzznzkofq.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnbnJnaXNna2dla3p6bnprb2ZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwNTU3NjUsImV4cCI6MjA3OTYzMTc2NX0.YlyeENHJ5NyGRF9gujJzZpNPUfTprkg0dNTnd463IDg';
-
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const BACKEND_API_URL = 'http://localhost:3000'; 
 
 // --- DOM ELEMENTS ---
 const fileInput = document.getElementById('file-upload');
 const uploadBtn = document.getElementById('upload-btn'); 
 const processBtn = document.getElementById('process-btn');
-const removeBtn = document.getElementById('remove-btn');
-const fileDisplay = document.getElementById('file-display');
+const removeBtn = document.getElementById('remove-btn'); 
 const displayText = document.getElementById('file-name-text');
 const errorMsg = document.getElementById('error-msg');
 
 let selectedFile = null;
 
-// --- FUNCTIONS ---
+// --- FILE SELECTION LOGIC ---
 uploadBtn.addEventListener('click', () => fileInput.click());
 
 fileInput.addEventListener('change', (event) => {
@@ -25,12 +22,10 @@ fileInput.addEventListener('change', (event) => {
   if (file) {
     if (file.name.endsWith('.csv') || file.name.endsWith('.sql') || file.name.endsWith('.docx')) {
       selectedFile = file;
-      
       displayText.textContent = file.name;
       displayText.style.color = '#374151'; 
       processBtn.disabled = false;
-      removeBtn.style.display = 'flex';
-      
+      removeBtn.style.display = 'flex'; 
     } else {
       errorMsg.textContent = 'Only .csv, .sql, or .docx files allowed';
       errorMsg.style.display = 'block';
@@ -41,44 +36,69 @@ fileInput.addEventListener('change', (event) => {
 
 function clearFile() {
   selectedFile = null;
-  fileInput.value = '';
-  
-  // Reset UI
+  fileInput.value = ''; 
   displayText.textContent = 'NO DATA DETECTED';
-  displayText.style.color = '';
+  displayText.style.color = ''; 
   processBtn.disabled = true;
-  removeBtn.style.display = 'none';
+  removeBtn.style.display = 'none'; 
   errorMsg.style.display = 'none';
 }
 
 removeBtn.addEventListener('click', clearFile);
 
-
-// --- UPLOAD LOGIC ---
+// --- THE NEW UPLOAD LOGIC (Talks to Localhost, NOT Supabase) ---
 processBtn.addEventListener('click', async () => {
   if (!selectedFile) return;
 
   try {
-    processBtn.innerText = 'Uploading...';
+    // 1. UPLOAD
+    processBtn.innerText = 'TRANSMITTING TO NODE...';
     processBtn.disabled = true;
     removeBtn.style.display = 'none';
 
-    const fileName = `${Date.now()}_${selectedFile.name}`;
+    const formData = new FormData();
+    formData.append('file', selectedFile);
 
-    const { data, error } = await supabase
-      .storage
-      .from('uploads') 
-      .upload(fileName, selectedFile);
+    // Send to your local server (server.js)
+    const uploadResponse = await fetch(`${BACKEND_API_URL}/upload`, {
+      method: 'POST',
+      body: formData,
+    });
 
-    if (error) throw error;
+    if (!uploadResponse.ok) {
+      const errorData = await uploadResponse.json();
+      throw new Error(errorData.message || 'Upload failed at Backend');
+    }
 
-    alert('Success! File sent to database for cleaning.');
-    clearFile(); // Reset everything after success
+    const result = await uploadResponse.json();
+    console.log('Upload success:', result);
+
+    // 2. PROCESS
+    processBtn.innerText = 'REQUESTING CLEANSE...';
+
+    const processResponse = await fetch(`${BACKEND_API_URL}/process`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        filePath: result.filePath,
+        fileName: selectedFile.name 
+      }),
+    });
+
+    if (!processResponse.ok) {
+      const procError = await processResponse.json();
+      throw new Error(procError.message || 'Processing failed');
+    }
+
+    // SUCCESS
+    alert('Success! Data uploaded and cleaning started.');
+    clearFile(); 
     processBtn.innerText = 'INITIATE_TRANSFER';
 
   } catch (err) {
     console.error(err);
-    errorMsg.textContent = 'Upload Failed: ' + err.message;
+    // This is where your error text comes from
+    errorMsg.textContent = 'System Error: ' + err.message;
     errorMsg.style.display = 'block';
     processBtn.innerText = 'INITIATE_TRANSFER'; 
     processBtn.disabled = false;
