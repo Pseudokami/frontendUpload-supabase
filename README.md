@@ -63,4 +63,4 @@ Since `node_modules` are not uploaded to GitHub, you must install the required l
 * Ensure you are accessing `index.html` via Live Server (port 5500), not double-clicking the file.
 
 **"Fetch Failed" / Timeout**
-* This project uses `axios` specifically to fix this issue. If it persists, ensure you ran `npm install` to get the latest version of Axios.
+* This project uses `axios` specifically to fix this issue. If it persists, ensure you ran `npm install Axios` to get the latest version of Axios.
